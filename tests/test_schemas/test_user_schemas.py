@@ -68,6 +68,12 @@ def test_user_response_valid(user_response_data):
     assert user.last_login_at== user_response_data["last_login_at"]
 
 # Tests for LoginRequest
+def login_request_data():
+    return {
+        "username": "john_doe_123@example.com",  # Must be a valid email
+        "password": "SecurePassword123!"
+    }
+
 def test_login_request_valid(login_request_data):
     login = LoginRequest(**login_request_data)
     assert login.username == login_request_data["username"]
