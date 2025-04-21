@@ -53,22 +53,31 @@ class UserService:
     async def create(cls, session: AsyncSession, user_data: Dict[str, str], email_service: EmailService) -> Optional[User]:
         try:
             validated_data = UserCreate(**user_data).model_dump()
-            existing_user = await cls.get_by_email(session, validated_data['username'])
+
+            # username is actually email – map it and remove `username`
+            validated_data["email"] = validated_data.pop("username")
+
+            existing_user = await cls.get_by_email(session, validated_data['email'])
             if existing_user:
                 logger.error("User with given email already exists.")
                 return None
+
             validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+
             new_user = User(**validated_data)
             new_user.verification_token = generate_verification_token()
+
             new_nickname = generate_nickname()
             while await cls.get_by_nickname(session, new_nickname):
                 new_nickname = generate_nickname()
             new_user.nickname = new_nickname
+
             session.add(new_user)
             await session.commit()
+
             await email_service.send_verification_email(new_user)
-            
             return new_user
+
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
@@ -76,30 +85,45 @@ class UserService:
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # Use the update_data directly – it's already validated via Pydantic in the API layer
-            if 'password' in update_data:
-                update_data['hashed_password'] = hash_password(update_data.pop('password'))
+            # Step 1: Validate first (using "username")
+            validated_user = UserUpdate(**update_data)
+            validated_data = validated_user.model_dump(exclude_unset=True)
 
-            # Perform the update
+            # Step 2: Remap "username" → "email" AFTER validation
+            if "username" in validated_data:
+                validated_data["email"] = validated_data.pop("username")
+
+            # Step 3: Abort if no valid fields
+            if not validated_data:
+                logger.warning("Update skipped: No valid fields after validation.")
+                return None
+
+            # Step 4: Hash password if present
+            if 'password' in validated_data:
+                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+
+            # Step 5: Execute update query
             query = (
                 update(User)
                 .where(User.id == user_id)
-                .values(**update_data)
+                .values(**validated_data)
                 .execution_options(synchronize_session="fetch")
             )
             await cls._execute_query(session, query)
 
-            # Fetch and return the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
                 await session.refresh(updated_user)
                 return updated_user
+            return None
 
+        except ValidationError as e:
+            logger.error(f"Validation error during user update: {e}")
             return None
         except Exception as e:
-            logger.error(f"Error during user update: {e}")
-            await session.rollback()
+            logger.error(f"Unexpected error during user update: {e}")
             return None
+
 
 
     @classmethod
