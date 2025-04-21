@@ -45,11 +45,14 @@ async def test_update_user_email_access_denied(async_client, verified_user, user
 
 @pytest.mark.asyncio
 async def test_update_user_email_access_allowed(async_client, admin_user, admin_token):
-    updated_data = {"username": f"updated_{admin_user.id}@example.com"}
+    safe_local_part = f"updated_{str(admin_user.id).replace('-', '')}"
+    updated_data = {"username": f"{safe_local_part}@example.com"}  # Safe, valid email
     headers = {"Authorization": f"Bearer {admin_token}"}
+    
     response = await async_client.put(f"/users/{admin_user.id}", json=updated_data, headers=headers)
     assert response.status_code == 200
     assert response.json()["username"] == updated_data["username"]
+
 
 
 @pytest.mark.asyncio

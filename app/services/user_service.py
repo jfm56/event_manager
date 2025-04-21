@@ -85,15 +85,19 @@ class UserService:
     @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
         try:
-            # Step 1: Validate first (using "username")
+            print("Raw incoming update_data:", update_data)
+
+            # Step 1: Validate original data (expects 'username')
             validated_user = UserUpdate(**update_data)
             validated_data = validated_user.model_dump(exclude_unset=True)
+            print("Initial validated data:", validated_data)
 
-            # Step 2: Remap "username" → "email" AFTER validation
+            # Step 2: Now safely map username → email
             if "username" in validated_data:
                 validated_data["email"] = validated_data.pop("username")
+            print("After remapping username to email:", validated_data)
 
-            # Step 3: Abort if no valid fields
+            # Step 3: Abort if no fields left
             if not validated_data:
                 logger.warning("Update skipped: No valid fields after validation.")
                 return None
@@ -102,7 +106,7 @@ class UserService:
             if 'password' in validated_data:
                 validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
 
-            # Step 5: Execute update query
+            # Step 5: Execute update
             query = (
                 update(User)
                 .where(User.id == user_id)

@@ -70,8 +70,27 @@ async def update_user(
     data = user_update.model_dump(exclude_unset=True)
 
     # 2) Map public "username" → ORM "email"
-    if "username" in data:
-        data["email"] = data.pop("username")
+    update_dict = user_update.model_dump(exclude_unset=True)
+    updated_user = await UserService.update(db, user_id, update_dict)
+
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return UserResponse.model_construct(
+        id=                  updated_user.id,
+        username=            updated_user.email,
+        nickname=            updated_user.nickname,
+        first_name=          updated_user.first_name,
+        last_name=           updated_user.last_name,
+        bio=                 updated_user.bio,
+        profile_picture_url= updated_user.profile_picture_url,
+        linkedin_profile_url=updated_user.linkedin_profile_url,
+        github_profile_url=  updated_user.github_profile_url,
+        role=                updated_user.role,
+        is_professional=     updated_user.is_professional,
+        created_at=          updated_user.created_at,
+        last_login_at=       updated_user.last_login_at,
+    )
 
     # 3) Convert any HttpUrl fields to str
     for fld in ("profile_picture_url","linkedin_profile_url","github_profile_url"):
