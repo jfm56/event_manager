@@ -1,4 +1,5 @@
 from builtins import str
+from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 from datetime import datetime
@@ -50,24 +51,41 @@ def user_response_data():
         # include any other required fields your schema has…
     }
 
-def test_user_response_valid(user_response_data):
-    user = UserResponse(**user_response_data)
-    assert user.id == user_response_data["id"]
-    assert user.username == user_response_data["username"]
-    assert user.created_at == user_response_data["created_at"]
-    assert user.last_login_at == user_response_data["last_login_at"]
+def user_response_data():
+    return {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "username": "test@example.com",
+        "first_name": "Test",
+        "last_name": "User",
+        "role": "AUTHENTICATED",
+        "is_professional": False,
+        "created_at": datetime(2025, 4, 21, 1, 34, 30, 268953),
+        "last_login_at": datetime(2025, 4, 21, 1, 34, 30, 268951)
+    }
 
-# Tests for UserResponse
-def test_user_response_valid(user_response_data):
-    user = UserResponse(**user_response_data)
-   # user.id is a UUID instance, so compare its string
-    assert str(user.id) == user_response_data["id"]
+def test_user_response_valid():
+    user_data = {
+        "id": str(uuid4()),  # valid UUID string
+        "username": "test@example.com",  # valid email
+        "first_name": "Test",
+        "last_name": "User",
+        "role": "AUTHENTICATED",
+        "is_professional": False,
+        "created_at": datetime.utcnow(),
+        "last_login_at": datetime.utcnow(),
+    }
 
-    assert user.username     == user_response_data["username"]
-    assert user.created_at   == user_response_data["created_at"]
-    assert user.last_login_at== user_response_data["last_login_at"]
+    user = UserResponse(**user_data)
+
+    assert str(user.id) == user_data["id"]
+    assert user.username == user_data["username"]
+    assert user.first_name == user_data["first_name"]
+    assert user.last_name == user_data["last_name"]
+    assert user.role.value == user_data["role"]
+    assert user.is_professional == user_data["is_professional"]
 
 # Tests for LoginRequest
+@pytest.fixture
 def login_request_data():
     return {
         "username": "john_doe_123@example.com",  # Must be a valid email
