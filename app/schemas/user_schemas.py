@@ -23,99 +23,96 @@ def validate_url(url: Optional[str]) -> Optional[str]:
         raise ValueError('Invalid URL format')
     return url
 
+
 class UserBase(BaseModel):
-    username: EmailStr = Field(..., example="john_doe_123")
-    nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example=generate_nickname())
-    first_name: Optional[str] = Field(None, example="John")
-    last_name: Optional[str] = Field(None, example="Doe")
-    bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
-    profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
-    github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
+    username: EmailStr = Field(..., example="john.doe@example.com")
+    nickname: Optional[constr(min_length=3, pattern=r"^[A-Za-z0-9_-]+$")] = Field(
+        None, example="jdoe_42"
+    )
+    first_name: str = Field(..., example="John")
+    last_name:  str = Field(..., example="Doe")
+    bio: Optional[str] = Field(None, example="Experienced software developer.")
+    profile_picture_url: Optional[str] = Field(
+        None, example="https://example.com/profiles/john.jpg"
+    )
+    linkedin_profile_url: Optional[str] = Field(
+        None, example="https://linkedin.com/in/johndoe"
+    )
+    github_profile_url: Optional[str] = Field(
+        None, example="https://github.com/johndoe"
+    )
 
-    _validate_urls = validator('profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True)(validate_url)
- 
-    class Config:
-        from_attributes = True
+    # ensure any provided URLs are valid
+    _validate_urls = validator(
+        "profile_picture_url", "linkedin_profile_url", "github_profile_url",
+        pre=True, allow_reuse=True
+    )(validate_url)
 
-class UserUpdate(UserBase):
-    email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
-    nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example="john_doe123")
-    first_name: Optional[str] = Field(None, example="John")
-    last_name: Optional[str] = Field(None, example="Doe")
-    bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
-    profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
-    github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
+    model_config = {
+        "from_attributes": True,   # allow ORM objects → schema
+    }
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8, example="Secure*Pass123")
+
+
+class UserUpdate(BaseModel):
+    username: Optional[EmailStr] = Field(None, example="new.email@example.com")
+    nickname: Optional[constr(min_length=3, pattern=r"^[A-Za-z0-9_-]+$")] = Field(
+        None, example="jdoe_43"
+    )
+    first_name: Optional[str]             = None
+    last_name:  Optional[str]             = None
+    bio:        Optional[str]             = None
+    profile_picture_url: Optional[str]    = None
+    linkedin_profile_url: Optional[str]   = None
+    github_profile_url: Optional[str]     = None
 
     @root_validator(pre=True)
-    def check_at_least_one_value(cls, values):
+    def require_one(cls, values):
         if not any(values.values()):
             raise ValueError("At least one field must be provided for update")
         return values
 
-class UserResponse(BaseModel):
-    id: UUID
-    username: EmailStr
-    nickname: Optional[constr(min_length=3, pattern=r'^[A-Za-z0-9_-]+$')] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    bio: Optional[str] = None
-    profile_picture_url: Optional[HttpUrl] = None
-    linkedin_profile_url: Optional[HttpUrl] = None
-    github_profile_url: Optional[HttpUrl] = None
-    role: UserRole = UserRole.AUTHENTICATED
-    is_professional: bool = False
-    created_at: datetime
-    last_login_at: datetime
+    model_config = {
+        "from_attributes": True,
+    }
 
-class LoginRequest(BaseModel):
-    username: str = Field(..., example="john_doe_123")
-    password: str = Field(..., example="Secure*1234")
+class UserResponse(UserBase):
+    id:               UUID
+    role:             UserRole
+    is_professional:  bool
+    created_at:       datetime
+    last_login_at:    datetime
 
-class UserBase(BaseModel):
-    username: EmailStr
-    nickname: Optional[constr(min_length=3, pattern=r'^[A-Za-z0-9_-]+$')] = None
-    first_name: str
-    last_name: str
-    bio: Optional[str] = None
-    profile_picture_url: Optional[HttpUrl] = None
-    linkedin_profile_url: Optional[HttpUrl] = None
-    github_profile_url: Optional[HttpUrl] = None
-
-class UserCreate(UserBase):
-    password: str
-
-class UserUpdate(BaseModel):
-    nickname: Optional[constr(min_length=3, pattern=r'^[A-Za-z0-9_]+$')] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    bio: Optional[str] = None
-    profile_picture_url: Optional[HttpUrl] = None
-    linkedin_profile_url: Optional[HttpUrl] = None
-    github_profile_url: Optional[HttpUrl] = None
+    model_config = {
+        "from_attributes": True,
+    }
 
 class UserListResponse(BaseModel):
     items: List[UserResponse] = Field(
         ...,
-        example=[
-            {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
-                "username": "john.doe@example.com",
-                "nickname": "jdoe42",
-                "first_name": "John",
-                "last_name": "Doe",
-                "bio": "Experienced developer",
-                "role": "AUTHENTICATED",
-                "is_professional": False,
-                "profile_picture_url": "https://example.com/profiles/john.jpg",
-                "linkedin_profile_url": "https://linkedin.com/in/johndoe",
-                "github_profile_url": "https://github.com/johndoe",
-                "created_at": "2025-04-21T01:34:30.268953",
-                "last_login_at": "2025-04-21T01:34:30.268951"
-            }
-        ]
+        example=[{
+            "id":                "123e4567-e89b-12d3-a456-426614174000",
+            "username":          "john.doe@example.com",
+            "nickname":          "jdoe_42",
+            "first_name":        "John",
+            "last_name":         "Doe",
+            "bio":               "Experienced developer",
+            "profile_picture_url":"https://example.com/profiles/john.jpg",
+            "linkedin_profile_url":"https://linkedin.com/in/johndoe",
+            "github_profile_url":"https://github.com/johndoe",
+            "role":              "AUTHENTICATED",
+            "is_professional":   False,
+            "created_at":        "2025-04-21T01:34:30.268953",
+            "last_login_at":     "2025-04-21T01:34:30.268951"
+        }]
     )
     total: int = Field(..., example=100)
-    page: int  = Field(..., example=1)
-    size: int  = Field(..., example=10)
+    page:  int = Field(..., example=1)
+    size:  int = Field(..., example=10)
+
+
+class LoginRequest(BaseModel):
+    username: EmailStr = Field(..., example="john.doe@example.com")
+    password: str      = Field(..., min_length=8, example="Secure*Pass123")
