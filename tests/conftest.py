@@ -208,13 +208,20 @@ async def unverified_user(db_session):
 
 @pytest.fixture(scope="function")
 async def users_with_same_role_50_users(db_session):
+    emails = set()
     users = []
+
     for _ in range(50):
+        email = fake.email()
+        while email in emails:
+            email = fake.email()
+        emails.add(email)
+    
         user_data = {
             "nickname": fake.user_name(),
             "first_name": fake.first_name(),
             "last_name": fake.last_name(),
-            "email": fake.email(),
+            "email": email,
             "hashed_password": fake.password(),
             "role": UserRole.AUTHENTICATED,
             "email_verified": False,
@@ -223,8 +230,10 @@ async def users_with_same_role_50_users(db_session):
         user = User(**user_data)
         db_session.add(user)
         users.append(user)
+
     await db_session.commit()
     return users
+
 
 @pytest.fixture
 async def admin_user(db_session: AsyncSession):
